@@ -3,6 +3,7 @@ import java.io._
 import scala.io._
 import swing._
 import Swing._
+import java.util.ArrayList
 
 object Client extends MainFrame with App
 {
@@ -14,6 +15,7 @@ object Client extends MainFrame with App
   var in = new BufferedSource(socket.getInputStream).getLines();
   val out = new PrintStream(socket.getOutputStream);
   val messsageTextField = new TextField(20);
+  val userlist = new ArrayList[String];
 
   println("Client initialized:");
 
@@ -44,9 +46,23 @@ object Client extends MainFrame with App
           System.exit(0);
         }
       })
+	  
+	  contents += new Button(new Action("Refresh user list"){
+		def apply{
+			out.println("REQ_USERLIST");
+			out.flush();
+			val receivedList = in.next();
+			val splitList = receivedList.split("\\|");
+			
+			for ( str <- splitList) {
+				userlist.add(str);
+				println(str);
+			}
+		}
+	  })
     }, BorderPanel.Position.Center)
   }
 
   pack();
-  visible = true
+  visible = true;
 }
