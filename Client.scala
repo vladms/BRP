@@ -13,7 +13,7 @@ object Client extends MainFrame with App
   val socket = new Socket(InetAddress.getByName("localhost"), 5555);
   var in = new BufferedSource(socket.getInputStream).getLines();
   val out = new PrintStream(socket.getOutputStream);
-  val messsageTextField = new TextField();
+  val messsageTextField = new TextField(20);
 
   println("Client initialized:");
 
@@ -32,6 +32,7 @@ object Client extends MainFrame with App
       });
 
       contents += messsageTextField;
+	  
 
       contents += new Button(new Action("Close")
       {
