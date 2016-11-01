@@ -1,7 +1,6 @@
 import java.net._
 import java.io._
 import scala.io._
-import scala.collection.mutable.ArrayBuffer
 import java.util.ArrayList
 
 object Server
@@ -29,19 +28,19 @@ object Server
                   val in = new BufferedReader(new InputStreamReader(currentClient.getInputStream())).readLine();
                   val out = new PrintStream(currentClient.getOutputStream());
 
-                  println("Client " + clients.indexOf(currentClient) + "sent: " + in);
-                  out.println("ACK");
+                  println("Client " + clients.indexOf(currentClient) + " sent: " + in);
+                  out.println("RECEIVED MESSAGE");
                   out.flush();
 
                   if(in.equals("DISCONNECT")){
                     clients.remove(currentClient);
-                    numberOfClients = numberOfClients - 1;
+					numberOfClients = numberOfClients - 1;
                     shouldRunLocal = false;
                   }
                 }
               } catch {
-                case e: Exception => e.printStackTrace();
-              }
+                case e: Exception => clients.remove(currentClient);
+			  }
             }
           });
 
@@ -68,7 +67,7 @@ object Server
         connectionListener.interrupt();
         System.exit(1);
       } else if(input.equals("STATUS")) {
-        println("Number of clients: " + clients.size());
+		println("Number of clients: " + clients.size());
       }
     }
   }
