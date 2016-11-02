@@ -7,9 +7,9 @@ import java.util.ArrayList
 
 object Client extends MainFrame with App
 {
-  title = "Simple Client";
+  title = "Test Client";
 
-  preferredSize = (500, 500);
+  preferredSize = (600, 400);
 
   val socket = new Socket(InetAddress.getByName("localhost"), 5555);
   var in = new BufferedSource(socket.getInputStream).getLines();
@@ -29,7 +29,6 @@ object Client extends MainFrame with App
         {
           out.println(messsageTextField.text);
           out.flush();
-          println("Client received: " + in.next);
         }
       });
 
@@ -53,11 +52,13 @@ object Client extends MainFrame with App
 			out.flush();
 			val receivedList = in.next();
 			val splitList = receivedList.split("\\|");
+			println("List of clients connected to server: ");
 			
 			for ( str <- splitList) {
 				userlist.add(str);
 				println(str);
 			}
+			println();
 		}
 	  })
     }, BorderPanel.Position.Center)

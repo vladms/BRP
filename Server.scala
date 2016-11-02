@@ -29,14 +29,21 @@ object Server
                   val out = new PrintStream(currentClient.getOutputStream());
 
                   println("Client " + clients.indexOf(currentClient) + " sent: " + in);
-                  out.println("RECEIVED MESSAGE");
-                  out.flush();
 
                   if(in.equals("DISCONNECT")){
                     clients.remove(currentClient);
 					numberOfClients = numberOfClients - 1;
                     shouldRunLocal = false;
-                  }
+                  } else if(in.equals("REQ_USERLIST")) {
+					var currentIndex = 0;
+					var clientList = "";
+					for(i <- 0 to clients.size() - 1) {
+						if(clients.get(i) != currentClient) {
+							clientList = clientList+ "CLIENT" + i + clients.get(i).getInetAddress() + "|";
+						}
+					}
+					out.println(clientList);
+				  }
                 }
               } catch {
                 case e: Exception => clients.remove(currentClient);
@@ -59,8 +66,6 @@ object Server
 
     while(shouldRun) {
       var input = scala.io.StdIn.readLine();
-
-
 
       if(input.equals("EXIT")) {
         shouldRun = false;
