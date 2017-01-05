@@ -1,69 +1,153 @@
+import java.awt._
+import java.awt.event._
 import java.net._
 import java.io._
+import javax.swing._
+import javax.swing.event._
 import scala.io._
-import swing._
-import Swing._
 import java.util.ArrayList
+import scala.swing.event.SelectionChanged
 
-object Client extends MainFrame with App
-{
-  title = "Test Client";
+object Client extends JFrame{
 
-  preferredSize = (600, 400);
+  class ClientClass() {
+    setTitle("Test Client");
 
-  val socket = new Socket(InetAddress.getByName("localhost"), 5555);
-  var in = new BufferedSource(socket.getInputStream).getLines();
-  val out = new PrintStream(socket.getOutputStream);
-  val messsageTextField = new TextField(20);
-  val userlist = new ArrayList[String];
+    setSize(600, 400);
 
-  println("Client initialized:");
+    val socket = new Socket(InetAddress.getByName("localhost"), 5555);
+    var in = new BufferedSource(socket.getInputStream).getLines();
+    val out = new PrintStream(socket.getOutputStream);
+    val userlist = new ArrayList[String];
+    var userArray : Array[String] = Array();
+    var table = new JList[String]();
 
-  contents = new BorderPanel()
-  {
-    add(new FlowPanel()
-    {
-      contents += new Button(new Action("Send")
-      {
-        def apply
-        {
-          out.println(messsageTextField.text);
-          out.flush();
+    println("Client initialized:");
+
+    def startListening() {
+      try {
+        val server = new ServerSocket(5556);
+        println("Server created");
+        val listeningThread = new Thread(new Runnable {
+          def run() {
+            try {
+
+              println("Listening for other client");
+              while (true) {
+                val otherClient = server.accept();
+
+                println("Other client has connected!");
+
+                val clientThread = new Thread(new Runnable {
+                  def run() {
+                    var in = new BufferedReader(new InputStreamReader(otherClient.getInputStream()));
+                    val out = new PrintStream(otherClient.getOutputStream());
+
+                    while (in.ready()) {
+
+                      val message = in.readLine();
+                      out.println("Response after accepting connection from you");
+                      println(message);
+                    }
+                  }
+                })
+
+                clientThread.start();
+              }
+            } catch {
+              case e: Exception => println(e);
+            }
+          }
+        });
+
+        listeningThread.start();
+      } catch {
+        case e: Exception => ;
+      }
+    }
+
+    def connectToPeer(address: String) {
+      val socketPeerToPeer = new Socket(InetAddress.getByName(address), 5556);
+      println("Connected to first client");
+      val outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream);
+      outPeerToPeer.println("I have connected to you and this is my message");
+      var inPeerToPeer = new BufferedSource(socketPeerToPeer.getInputStream).getLines();
+
+      System.out.println(inPeerToPeer.next());
+    }
+
+    startListening();
+
+    val messsageTextField = new JTextField(20);
+    val contents = new JPanel();
+    val sendButton = new JButton("Send");
+    val closeButton = new JButton("Close");
+    val requestButton = new JButton("Request user list");
+    val tablePanel = new JPanel();
+
+    sendButton.addActionListener(new ActionListener() {
+      def actionPerformed(e: ActionEvent) {
+        println("SEND");
+      };
+    });
+
+    contents.add(sendButton);
+
+    contents.add(messsageTextField);
+
+
+    closeButton.addActionListener(new ActionListener() {
+      def actionPerformed(e: ActionEvent) {
+        println("CLOSE");
+      };
+    });
+
+    contents.add(closeButton);
+
+
+    requestButton.addActionListener(new ActionListener() {
+      def actionPerformed(e: ActionEvent) {
+        out.println("REQ_USERLIST");
+        out.flush();
+        val receivedList = in.next();
+        val splitList = receivedList.split("\\|");
+        println("List of clients connected to server: ");
+
+        userlist.clear();
+        for ( str <- splitList) {
+          userlist.add(str);
+          println(str);
         }
-      });
 
-      contents += messsageTextField;
-	  
+        userArray = Array();
+        userArray = userlist.toArray[String](userArray);
 
-      contents += new Button(new Action("Close")
-      {
-        def apply
-        {
-          out.println("DISCONNECT");
-          out.flush();
-          socket.close();
-          System.exit(0);
-        }
-      })
-	  
-	  contents += new Button(new Action("Refresh user list"){
-		def apply{
-			out.println("REQ_USERLIST");
-			out.flush();
-			val receivedList = in.next();
-			val splitList = receivedList.split("\\|");
-			println("List of clients connected to server: ");
-			
-			for ( str <- splitList) {
-				userlist.add(str);
-				println(str);
-			}
-			println();
-		}
-	  })
-    }, BorderPanel.Position.Center)
+        contents.remove(table);
+        table = new JList[String](userArray);
+        table.setMinimumSize(new Dimension(200, 200));
+        table.setPreferredSize(new Dimension(200, 200));
+        table.addListSelectionListener(new ListSelectionListener() {
+          def valueChanged(e: ListSelectionEvent){
+            println(table.getSelectedIndex());
+          }
+        });
+        contents.add(table);
+        contents.repaint();
+        contents.setVisible(false);
+        contents.setVisible(true);
+      };
+    })
+
+    contents.add(requestButton);
+
+    contents.add(table);
+
+    add(contents);
+    setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+    setVisible(true);
   }
 
-  pack();
-  visible = true;
+  def main(args: Array[String]) {
+    val client = new ClientClass();
+  }
 }
