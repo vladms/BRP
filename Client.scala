@@ -22,44 +22,35 @@ object Client extends JFrame {
     var userArray: Array[String] = Array();
     var table = new JList[String]();
     var socketPeerToPeer = new Socket();
+    var inPeerToPeer = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    var outPeerToPeer = new PrintStream(socket.getOutputStream());
     var peerConnected = false;
+    var isSending = false;
+    var listening = true;
 
     println("Client initialized:");
     val listenerSocket = 5556;
 
-    def startListening() {
+    def startListening(address: String) {
       try {
-        val server = new ServerSocket(listenerSocket);
+        val server = new ServerSocket(Integer.valueOf(address));
         println("Server created");
         val listeningThread = new Thread(new Runnable {
           def run() {
             try {
               peerConnected = true;
-              out.println("SUCCESS/" + listenerSocket);
+              out.println("SUCCESS/" + address);
               out.flush();
               println("Listening for other client");
-              while (true) {
+              while (listening) {
                 val otherClient = server.accept();
                 socketPeerToPeer = otherClient;
+                inPeerToPeer = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream()));
+                outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream());
                 startBRP();
-                println("Other client has connected!");
-
-                val clientThread = new Thread(new Runnable {
-                  def run() {
-                    var in = new BufferedReader(new InputStreamReader(otherClient.getInputStream()));
-                    val out = new PrintStream(otherClient.getOutputStream());
-
-                    while (in.ready()) {
-                      val message = in.readLine();
-                      println("Message readed from listening user: " + message);
-                      out.println("#listeningUser: Response after accepting connection from you");
-                      println(message);
-                    }
-                  }
-                })
-
-                clientThread.start();
               }
+
+              server.close();
             } catch {
               case e: Exception => out.println("FAILURE");
                 println(e);
@@ -76,19 +67,63 @@ object Client extends JFrame {
 
       var shouldRunLocal = true;
         try {
-          while (shouldRunLocal) {
-            var in = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream())).readLine();
-            val messageFromTheOtherClient = in;
-            println("The other user sent:  " + messageFromTheOtherClient);
-            if (messageFromTheOtherClient.equals("DISCONNECT")){
-              println("I should autocancel myself!");
-              shouldRunLocal = false;
-            }
+            // val in = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream()));
+            // val out = new PrintStream(socketPeerToPeer.getOutputStream(), true);
 
-            
+          while (shouldRunLocal) {
+            if (isSending == false) {
+              
+              var messageFromTheOtherClient = inPeerToPeer.readLine();
+
+              if (messageFromTheOtherClient.equals("DISCONNECT")){
+                  println("I should autocancel myself!");
+                  shouldRunLocal = false;
+                  contents.remove(messageArea);
+                  contents.add(table);
+                  contents.repaint();
+                  contents.setVisible(false);
+                  contents.setVisible(true);
+              } else if (!messageFromTheOtherClient.equals("IGNORE")) {
+                
+                var numberOfChunks = 0;
+                var waitForOtherChunks = false;
+                var currentMessage = "";
+                
+                println("RECEIVED:  " + messageFromTheOtherClient);
+
+                if (messageFromTheOtherClient.split("#")(0).equals("START_SENDING")) {
+                  println("start_sending");
+                  numberOfChunks = Integer.valueOf(messageFromTheOtherClient.split("#")(1));
+                  currentMessage = "";
+                  waitForOtherChunks = true;
+                  outPeerToPeer.println("IGNORE");
+                  outPeerToPeer.println("ACKNOWLEDGED");
+                  println("SENT: ACKNOWLEDGED");
+                }
+
+                while (waitForOtherChunks) {
+                  messageFromTheOtherClient = inPeerToPeer.readLine();
+                  currentMessage = currentMessage + messageFromTheOtherClient;
+                  numberOfChunks = numberOfChunks - 1;
+                  println("REDEIVED:  " + messageFromTheOtherClient);
+                  outPeerToPeer.println("ACKNOWLEDGED");
+                  println("SENT: ACKNOWLEDGED");
+                  if (numberOfChunks == 0) {
+                    waitForOtherChunks = false;
+                  }
+                }
+
+
+
+
+                println("MESSAGE:  " + currentMessage);
+                messageArea.append("OTHER_PERSON: " + currentMessage + "\n");
+              }
+
+            }
           }
         } catch {
-          case e: Exception => println("Error errorError errorError errorError error");
+          case e: Exception => println(e);
         }
 
     }
@@ -96,13 +131,21 @@ object Client extends JFrame {
       peerConnected = true;
       println("SocketAdressToConnect: " + address);
       socketPeerToPeer = new Socket(InetAddress.getByName("localhost"), Integer.valueOf(address));
+      inPeerToPeer = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream()));
+      outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream());
       println("Connected to the other client");
-      val outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream);
-      outPeerToPeer.println("#Requester user: I have connected to you and this is my message");
-      var inPeerToPeer = new BufferedSource(socketPeerToPeer.getInputStream).getLines();
-      System.out.println(inPeerToPeer.next());
+      // val outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream);
+      // outPeerToPeer.println("#Requester user: I have connected to you and this is my message");
+      // var inPeerToPeer = new BufferedSource(socketPeerToPeer.getInputStream).getLines();
+      // System.out.println(inPeerToPeer.next());
       
       startBRP();
+    }
+
+    def disconnectFromPeer() {
+      outPeerToPeer.println("DISCONNECT");
+      listening = false;
+      peerConnected = false;
     }
 
     // startListening();
@@ -113,16 +156,44 @@ object Client extends JFrame {
     val closeButton = new JButton("Close");
     val requestButton = new JButton("Request user list");
     val tablePanel = new JPanel();
+    var messageArea = new JTextArea(20, 20);
 
     sendButton.addActionListener(new ActionListener() {
       def actionPerformed(e: ActionEvent) {
 
         if (peerConnected){
-          println("SENDING :");
-          println(messsageTextField.getText());
-          
-          val outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream);
-          outPeerToPeer.println(messsageTextField.getText());
+          messageArea.append("YOU: " + messsageTextField.getText() + "\n");
+          var messageToSend = messsageTextField.getText();
+          var messageLength = messageToSend.length();
+          var currentChunk = 0;
+          // val outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream(), true);
+          // val inPeerToPeer = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream()))
+          isSending = true;
+          println("SENDING :" + messsageTextField.getText());
+
+          outPeerToPeer.println("START_SENDING#" + messageLength);
+          println("SENT: " + "START_SENDING#" + messageLength);
+
+          var response = inPeerToPeer.readLine();
+          println("RECEIVED: " + response); 
+          if (response.equals("ACKNOWLEDGED")) {
+            while (isSending) {
+              var chunkToSend = messageToSend.substring(currentChunk, currentChunk + 1);
+              outPeerToPeer.println(chunkToSend);
+              println("SENT: " + chunkToSend);
+
+              response = inPeerToPeer.readLine();
+              println("RECEIVED: " + response);            
+              if (response.equals("ACKNOWLEDGED")) {
+                currentChunk = currentChunk + 1;
+                if (currentChunk == messageLength) {
+                  isSending = false;
+                }
+              }
+            }
+          }
+
+
         }
       };
     });
@@ -143,9 +214,16 @@ object Client extends JFrame {
 
     requestButton.addActionListener(new ActionListener() {
       def actionPerformed(e: ActionEvent) {
+        if (peerConnected) {
+          disconnectFromPeer();
+          contents.remove(messageArea);
+          contents.add(table);
+          contents.repaint();
+          contents.setVisible(false);
+          contents.setVisible(true);
+        }
         out.println("REQ_USERLIST");
         out.flush();
-
       };
     })
 
@@ -168,7 +246,13 @@ object Client extends JFrame {
             println("Server sent " + socketToOpen);
 
             if (socketToOpen.startsWith("LISTENSOCKET")) {
-              startListening();
+              contents.remove(table);
+              messageArea = new JTextArea(20, 20);
+              contents.add(messageArea);
+              contents.repaint();
+              contents.setVisible(false);
+              contents.setVisible(true);
+              startListening(socketToOpen.split("/")(1));
             } else if (socketToOpen.startsWith("TALKSOCKET")) {
               connectToPeer(socketToOpen.split("/")(1));
             } else if (socketToOpen.startsWith("CLIENT")) {
@@ -186,6 +270,7 @@ object Client extends JFrame {
               userArray = Array();
               userArray = userlist.toArray[String](userArray);
 
+              contents.remove(messageArea);
               contents.remove(table);
               table = new JList[String](userArray);
               table.setMinimumSize(new Dimension(200, 200));
@@ -200,7 +285,12 @@ object Client extends JFrame {
                     println(table.getSelectedIndex());
                     val clientToConnect = in;
                     println("clientToConnectSocket " + clientToConnect);
-
+                    contents.remove(table);
+                    messageArea = new JTextArea(20, 20);
+                    contents.add(messageArea);
+                    contents.repaint();
+                    contents.setVisible(false);
+                    contents.setVisible(true);
                   }
                 }
               });
