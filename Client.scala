@@ -27,7 +27,7 @@ object Client extends JFrame {
     var peerConnected = false;
     var isSending = false;
     var listening = true;
-
+    val maxNumberOfRetransmissions = 4;
     println("Client initialized:");
     val listenerSocket = 5556;
 
@@ -66,6 +66,10 @@ object Client extends JFrame {
     def startBRP(){
 
       var shouldRunLocal = true;
+      var enteredSimulation = -1;
+      var maxEnteredSimulation = 2;
+
+
         try {
             // val in = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream()));
             // val out = new PrintStream(socketPeerToPeer.getOutputStream(), true);
@@ -97,24 +101,30 @@ object Client extends JFrame {
                   currentMessage = "";
                   waitForOtherChunks = true;
                   outPeerToPeer.println("IGNORE");
+                  outPeerToPeer.flush();
                   outPeerToPeer.println("ACKNOWLEDGED");
                   println("SENT: ACKNOWLEDGED");
                 }
+                currentMessage = "";
+                  while (waitForOtherChunks) {
+                    messageFromTheOtherClient = inPeerToPeer.readLine();
+                    println("messageFromTheOtherClient: " + messageFromTheOtherClient);  
 
-                while (waitForOtherChunks) {
-                  messageFromTheOtherClient = inPeerToPeer.readLine();
-                  currentMessage = currentMessage + messageFromTheOtherClient;
-                  numberOfChunks = numberOfChunks - 1;
-                  println("REDEIVED:  " + messageFromTheOtherClient);
-                  outPeerToPeer.println("ACKNOWLEDGED");
-                  println("SENT: ACKNOWLEDGED");
-                  if (numberOfChunks == 0) {
-                    waitForOtherChunks = false;
-                  }
+                    if (numberOfChunks == 4 && enteredSimulation < maxEnteredSimulation){
+                      enteredSimulation += 1;
+                      println("SIMULATE ERROR");  
+                      outPeerToPeer.println("NOT ACKNOWLEDGED");
+                    } else {
+                      currentMessage = currentMessage + messageFromTheOtherClient;
+                      numberOfChunks = numberOfChunks - 1;
+                      println("RECEIVED:  " + messageFromTheOtherClient);
+                      outPeerToPeer.println("ACKNOWLEDGED");
+                      println("SENT: ACKNOWLEDGED");
+                      if (numberOfChunks == 0) {
+                       waitForOtherChunks = false;
+                     }
+                    }
                 }
-
-
-
 
                 println("MESSAGE:  " + currentMessage);
                 messageArea.append("OTHER_PERSON: " + currentMessage + "\n");
@@ -156,42 +166,78 @@ object Client extends JFrame {
     val closeButton = new JButton("Close");
     val requestButton = new JButton("Request user list");
     val tablePanel = new JPanel();
-    var messageArea = new JTextArea(20, 20);
+    var messageArea = new JTextArea(30, 30);
 
     sendButton.addActionListener(new ActionListener() {
       def actionPerformed(e: ActionEvent) {
 
         if (peerConnected){
-          messageArea.append("YOU: " + messsageTextField.getText() + "\n");
-          var messageToSend = messsageTextField.getText();
-          var messageLength = messageToSend.length();
-          var currentChunk = 0;
-          // val outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream(), true);
-          // val inPeerToPeer = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream()))
-          isSending = true;
-          println("SENDING :" + messsageTextField.getText());
+          var nrOfTries = 0;
+          if (!isSending){
+            isSending = true;
 
-          outPeerToPeer.println("START_SENDING#" + messageLength);
-          println("SENT: " + "START_SENDING#" + messageLength);
+            messageArea.append("YOU: " + messsageTextField.getText() + "\n");
+            var messageToSend = messsageTextField.getText();
+            
 
-          var response = inPeerToPeer.readLine();
-          println("RECEIVED: " + response); 
-          if (response.equals("ACKNOWLEDGED")) {
-            while (isSending) {
-              var chunkToSend = messageToSend.substring(currentChunk, currentChunk + 1);
-              outPeerToPeer.println(chunkToSend);
-              println("SENT: " + chunkToSend);
+            var messageLength = messageToSend.length();
+            var currentChunk = 0;
+            if (messageLength > 0){
+              // val outPeerToPeer = new PrintStream(socketPeerToPeer.getOutputStream(), true);
+              // val inPeerToPeer = new BufferedReader(new InputStreamReader(socketPeerToPeer.getInputStream()))
+              println("SENDING :" + messsageTextField.getText());
 
-              response = inPeerToPeer.readLine();
-              println("RECEIVED: " + response);            
-              if (response.equals("ACKNOWLEDGED")) {
-                currentChunk = currentChunk + 1;
-                if (currentChunk == messageLength) {
-                  isSending = false;
-                }
-              }
-            }
+              outPeerToPeer.println("START_SENDING#" + messageLength);
+              println("SENT: " + "START_SENDING#" + messageLength);
+
+              var response = inPeerToPeer.readLine();
+              if (response.length() > 0){
+                println("RECEIVED: " + response); 
+                if (response.equals("ACKNOWLEDGED")) {
+                  while (isSending) {
+                    println("messageToSend: " + messageToSend); 
+                      var chunkToSend = messageToSend.substring(currentChunk, currentChunk + 1);
+
+                      outPeerToPeer.println(chunkToSend);
+                      println("SENT: " + chunkToSend);
+
+                      response = inPeerToPeer.readLine();
+                      println("RECEIVED: " + response);            
+                      if (response != null){
+                        if (response.equals("ACKNOWLEDGED")) {
+                          currentChunk = currentChunk + 1;
+                          nrOfTries = 0;
+                          if (currentChunk == messageLength) {
+                            isSending = false;
+                          }
+                        } else {
+                          nrOfTries += 1;
+                          if (nrOfTries == maxNumberOfRetransmissions){
+                            println("Current junk: " +currentChunk + " was not sent! Moving on!");
+                            nrOfTries = 0;
+                            currentChunk += 1;
+                            if (currentChunk == messageLength) {
+                              isSending = false;
+                            }
+                          }
+
+                          println("Response from other client is not ACKNOWLEDGED");
+                          println("I should retry to send the junk "+ nrOfTries + " times");
+                        }
+                      }
+                 }
+               }
+             } else {
+              //Response is NULL
+              println("Response is null"); 
+              isSending = false;
+
+             }
+            
           }
+        } else {
+                    isSending = false;
+        }
 
 
         }
