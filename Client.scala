@@ -29,7 +29,6 @@ object Client extends JFrame {
     var listening = true;
     val maxNumberOfRetransmissions = 4;
     println("Client initialized:");
-    val listenerSocket = 5556;
 
     def startListening(address: String) {
       try {
@@ -196,7 +195,6 @@ object Client extends JFrame {
                 println("RECEIVED: " + response); 
                 if (response.equals("ACKNOWLEDGED")) {
                   while (isSending) {
-                    println("messageToSend: " + messageToSend); 
                       var chunkToSend = messageToSend.substring(currentChunk, currentChunk + 1);
 
                       outPeerToPeer.println(chunkToSend);
@@ -223,9 +221,6 @@ object Client extends JFrame {
                               messsageTextField.setText("");
                             }
                           }
-
-                          println("Response from other client is not ACKNOWLEDGED");
-                          println("I should retry to send the junk "+ nrOfTries + " times");
                         }
                       }
                  }
