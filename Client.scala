@@ -100,7 +100,6 @@ object Client extends JFrame {
                   currentMessage = "";
                   waitForOtherChunks = true;
                   outPeerToPeer.println("IGNORE");
-                  outPeerToPeer.flush();
                   outPeerToPeer.println("ACKNOWLEDGED");
                   println("SENT: ACKNOWLEDGED");
                 }
