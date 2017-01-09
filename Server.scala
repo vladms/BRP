@@ -71,7 +71,7 @@ object Server {
 
                     receiverUserOut.println("TALKSOCKET/" + sendingUserIndex);
 
-                  } else if (in.equals("FAILURE")) {
+                  } else if (in.startsWith("FAILURE")) {
                     numberOfConnectedUsers -= 1;
                     val receiverUserOut = new PrintStream(userRequestingConnectionToAnotherUser.getOutputStream());
                     receiverUserOut.println("RECEIVER_USER_CAN'T_OPEN_SOCKET");

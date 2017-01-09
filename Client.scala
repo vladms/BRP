@@ -174,6 +174,7 @@ object Client extends JFrame {
         if (peerConnected){
           var nrOfTries = 0;
           if (!isSending){
+
             isSending = true;
 
             messageArea.append("YOU: " + messsageTextField.getText() + "\n");
@@ -209,6 +210,7 @@ object Client extends JFrame {
                           nrOfTries = 0;
                           if (currentChunk == messageLength) {
                             isSending = false;
+                            messsageTextField.setText("");
                           }
                         } else {
                           nrOfTries += 1;
@@ -218,6 +220,7 @@ object Client extends JFrame {
                             currentChunk += 1;
                             if (currentChunk == messageLength) {
                               isSending = false;
+                              messsageTextField.setText("");
                             }
                           }
 
@@ -292,13 +295,17 @@ object Client extends JFrame {
             println("Server sent " + socketToOpen);
 
             if (socketToOpen.startsWith("LISTENSOCKET")) {
-              contents.remove(table);
-              messageArea = new JTextArea(20, 20);
-              contents.add(messageArea);
-              contents.repaint();
-              contents.setVisible(false);
-              contents.setVisible(true);
-              startListening(socketToOpen.split("/")(1));
+              if (!peerConnected){
+                contents.remove(table);
+                messageArea = new JTextArea(20, 20);
+                contents.add(messageArea);
+                contents.repaint();
+                contents.setVisible(false);
+                contents.setVisible(true);
+                startListening(socketToOpen.split("/")(1));
+              } else {
+                out.println("FAILURE/" + socketToOpen.split("/")(1));    
+              }
             } else if (socketToOpen.startsWith("TALKSOCKET")) {
               connectToPeer(socketToOpen.split("/")(1));
             } else if (socketToOpen.startsWith("CLIENT")) {
@@ -344,6 +351,9 @@ object Client extends JFrame {
               contents.repaint();
               contents.setVisible(false);
               contents.setVisible(true);
+            } else if (socketToOpen.startsWith("RECEIVER_USER_CAN")){
+              messsageTextField.setText("Selected user is busy!");
+              println("Selected user is busy!");
             }
           }
         } catch {
