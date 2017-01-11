@@ -19,6 +19,8 @@ object Server {
 
         while (shouldRun) {
           val currentClient = server.accept();
+          var in = new BufferedReader(new InputStreamReader(currentClient.getInputStream()));
+          val out = new PrintStream(currentClient.getOutputStream());
 
           clients.add(currentClient);
           numberOfClients = numberOfClients + 1;
@@ -28,21 +30,20 @@ object Server {
 
               try {
                 while (shouldRunLocal) {
-                  var in = new BufferedReader(new InputStreamReader(currentClient.getInputStream())).readLine();
-                  val out = new PrintStream(currentClient.getOutputStream());
-                  if (in == null) {
-                    in = "DISCONNECT";
+                  var request = in.readLine();
+                  if (request == null) {
+                    request = "DISCONNECT";
                   }
 
 
-                  println("Client " + clients.indexOf(currentClient) + " sent: " + in);
+                  println("Client " + clients.indexOf(currentClient) + " sent: " + request);
 
-                  if (in.equals("DISCONNECT")) {
+                  if (request.equals("DISCONNECT")) {
                     //Client disconnected
                     clients.remove(currentClient);
                     numberOfClients = numberOfClients - 1;
                     shouldRunLocal = false;
-                  } else if (in.equals("REQ_USERLIST")) {
+                  } else if (request.equals("REQ_USERLIST")) {
                     //Client requests users list
                     var currentIndex = 0;
                     var clientList = "";
@@ -52,26 +53,27 @@ object Server {
                       }
                     }
                     out.println(clientList);
-                  } else if (in.startsWith("CLIENT")) {
+                  } else if (request.startsWith("CLIENT")) {
                     //Client wants to connect to CLIENT X
 
                     userRequestingConnectionToAnotherUser = currentClient;
-                    val listeningUserIndex = Integer.valueOf(in.replaceAll("[^0-9]", ""));
+                    val listeningUserIndex = Integer.valueOf(request.replaceAll("[^0-9]", ""));
                     numberOfConnectedUsers += 1;
                     val userToUserSocket = 5555 + numberOfConnectedUsers;
                     //Send to the receiver user the socket that he should open
                     val client = clients.get(listeningUserIndex);
 
                     val receiverUserOut = new PrintStream(client.getOutputStream());
-                    receiverUserOut.println("LISTENSOCKET/" + userToUserSocket);
+                    receiverUserOut.println("LISTENSOCKET/" + userToUserSocket + "/CLIENT" + clients.indexOf(currentClient));
 
-                  } else if (in.startsWith("SUCCESS")) {
-                    val sendingUserIndex = Integer.valueOf(in.replaceAll("[^0-9]", ""));
-                    val receiverUserOut = new PrintStream(userRequestingConnectionToAnotherUser.getOutputStream());
+                  } else if (request.startsWith("SUCCESS")) {
+                    
+                    val sendingUserIndex = Integer.valueOf(request.split("/")(2).replaceAll("[^0-9]", ""));
+                    val receiverUserOut = new PrintStream(clients.get(sendingUserIndex).getOutputStream());
+                    println("SENT TALKSOCKET TO receiverUserOut: " +  receiverUserOut);
+                    receiverUserOut.println("TALKSOCKET/" + request.split("/")(1));
 
-                    receiverUserOut.println("TALKSOCKET/" + sendingUserIndex);
-
-                  } else if (in.startsWith("FAILURE")) {
+                  } else if (request.startsWith("FAILURE")) {
                     numberOfConnectedUsers -= 1;
                     val receiverUserOut = new PrintStream(userRequestingConnectionToAnotherUser.getOutputStream());
                     receiverUserOut.println("RECEIVER_USER_CAN'T_OPEN_SOCKET");
